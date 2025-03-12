@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-import pickle
+from transformers import TFGPT2LMHeadModel, GPT2Tokenizer
 import random
 import nltk
 from nltk.stem import WordNetLemmatizer
@@ -7,11 +7,9 @@ from nltk.stem import WordNetLemmatizer
 # Initialize Flask app
 app = Flask(__name__)
 
-# Load trained chatbot model
-data = pickle.load(open("models/chatbot_model.pkl", "rb"))
-model = data["model"]
-vectorizer = data["vectorizer"]
-responses = data["responses"]
+# Load fine-tuned GPT-4 model and tokenizer
+model = TFGPT2LMHeadModel.from_pretrained("fine-tuned-gpt-4")
+tokenizer = GPT2Tokenizer.from_pretrained("fine-tuned-gpt-4")
 
 lemmatizer = WordNetLemmatizer()
 
@@ -27,14 +25,10 @@ def chat():
     words = nltk.word_tokenize(user_message)
     processed_input = " ".join([lemmatizer.lemmatize(w.lower()) for w in words])
     
-    # Convert input to model format
-    X_input = vectorizer.transform([processed_input])
-    
-    # Predict intent tag
-    predicted_tag = model.predict(X_input)[0]
-    
-    # Get bot response
-    bot_response = random.choice(responses[predicted_tag])
+    # Generate response using fine-tuned GPT-4 model
+    inputs = tokenizer.encode(processed_input, return_tensors="tf")
+    outputs = model.generate(inputs, max_length=150, num_return_sequences=1)
+    bot_response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
     return jsonify({"reply": bot_response})
 
